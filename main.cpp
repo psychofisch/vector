@@ -2,65 +2,6 @@
 #include <iostream>
 //#include <vector>
 
-class IntVector
-{
-public:
-	IntVector()
-		:m_size(0),
-		m_capacity(1)
-	{
-		m_memory = new int[m_capacity];
-	}
-
-	int operator[](size_t i)
-	{
-		return *(static_cast<int*>(m_memory) + i);
-	}
-
-	void push_back(int i)
-	{
-		if (m_capacity < m_size + 1)
-		{
-			resize(m_capacity * 2);
-		}
-
-		int* tmp = new(static_cast<int*>(m_memory) + m_size) int;
-		*tmp = i;
-		m_size++;
-	}
-
-	size_t size()
-	{
-		return m_size;
-	}
-
-	void resize(size_t s)
-	{
-		size_t newCapacity = s;
-		void* newMemory = new int[newCapacity];
-
-		for (size_t i = 0; i < m_capacity; i++)
-		{
-			int* tmp = new(static_cast<int*>(newMemory) + i) int;
-			*tmp = *(static_cast<int*>(m_memory) + i);
-		}
-
-		delete[] m_memory;
-		m_memory = newMemory;
-		m_capacity = newCapacity;
-	}
-
-	~IntVector()
-	{
-		delete[] m_memory;
-	}
-
-private:
-	void* m_memory;
-	size_t m_capacity;
-	size_t m_size;
-};
-
 template <class T>
 class vector
 {
@@ -68,23 +9,26 @@ public:
 	vector()
 	{
 		m_size = 0;
-		m_capacity = 1;
+		m_capacity = 0;
 		m_memory = new T[m_capacity];
 	};
 
 	T operator[](size_t i)
 	{
-		return *(static_cast<T*>(m_memory) + i * sizeof(T*));
+		return *(static_cast<T*>(m_memory) + i);
 	};
 
 	void push_back(const T& i)
 	{
 		if (m_size >= m_capacity)
 		{
-			reserve(m_capacity * 2);
+			if (m_capacity == 0)
+				reserve(1);
+			else
+				reserve(m_capacity * 2);
 		}
 
-		T* tmp = new(static_cast<T*>(m_memory) + m_size * sizeof(T*)) T;
+		T* tmp = new(static_cast<T*>(m_memory) + m_size) T;
 		*tmp = i;
 		m_size++;
 	};
@@ -105,7 +49,7 @@ public:
 		{
 			for (size_t i = s; i < m_size; i++)
 			{
-				(static_cast<T*>(m_memory) + i * sizeof(T*))->~T();
+				(static_cast<T*>(m_memory) + i)->~T();
 			}
 			m_size = s;
 		}
@@ -116,15 +60,15 @@ public:
 				size_t newCapacity = s;
 				void* newMemory = new T[newCapacity];
 
-				//for (size_t i = 0; i < s; i++)
-				//{
-				//	T* tmp = new(static_cast<T*>(newMemory) + i * sizeof(T*)) T;
+				for (size_t i = 0; i < s; i++)
+				{
+					T* tmp = new(static_cast<T*>(newMemory) + i) T;
 
-				//	if (i < m_size)
-				//		*tmp = *(static_cast<T*>(m_memory) + i * sizeof(T*));//copy old object
-				//	else
-				//		*tmp = val;//create default
-				//}
+					if (i < m_size)
+						*tmp = *(static_cast<T*>(m_memory) + i);//copy old object
+					else
+						*tmp = val;//create default
+				}
 
 				delete[] m_memory;
 				m_memory = newMemory;
@@ -134,7 +78,7 @@ public:
 			else {
 				for (size_t i = m_size; i < s; i++)
 				{
-					T* tmp = new(static_cast<T*>(m_memory) + i * sizeof(T*)) T;
+					T* tmp = new(static_cast<T*>(m_memory) + i) T;
 					*tmp = val;
 				}
 				m_size = s;
@@ -144,16 +88,21 @@ public:
 
 	void reserve(size_t s)
 	{
-		size_t newCapacity = s;
-		void* newMemory = new T[newCapacity];
-
-		for (size_t i = 0; i < m_size; i++)
+		if (s > m_capacity)
 		{
-			T* tmp = new(static_cast<T*>(newMemory) + i * sizeof(T*)) T;
-			*tmp = *(static_cast<T*>(m_memory) + i * sizeof(T*));
-		}
+			size_t newCapacity = s;
+			void* newMemory = new T[newCapacity];
 
-		m_capacity = newCapacity;
+			for (size_t i = 0; i < m_size; i++)
+			{
+				T* tmp = new(static_cast<T*>(newMemory) + i) T;
+				*tmp = *(static_cast<T*>(m_memory) + i);
+			}
+
+			delete[] m_memory;
+			m_memory = newMemory;
+			m_capacity = newCapacity;
+		}
 	};
 
 	~vector()
@@ -169,6 +118,51 @@ private:
 
 int main()
 {
+	//reserve test
+		//expected output
+		/*
+		making foo grow :
+		capacity changed : 1
+			capacity changed : 2
+			capacity changed : 4
+			capacity changed : 8
+			capacity changed : 16
+			capacity changed : 32
+			capacity changed : 64
+			capacity changed : 128
+			making bar grow :
+		capacity changed : 100
+		*/
+
+	size_t sz;
+
+	vector<int> foo;
+	sz = foo.capacity();
+	std::cout << "making foo grow:\n";
+	for (int i = 0; i<100; ++i) {
+		foo.push_back(i);
+		if (sz != foo.capacity()) {
+			sz = foo.capacity();
+			std::cout << "capacity changed: " << sz << '\n';
+		}
+	}
+
+	vector<int> bar;
+	sz = bar.capacity();
+	bar.reserve(100);   // this is the only difference with foo above
+	std::cout << "making bar grow:\n";
+	for (int i = 0; i<100; ++i) {
+		bar.push_back(i);
+		if (sz != bar.capacity()) {
+			sz = bar.capacity();
+			std::cout << "capacity changed: " << sz << '\n';
+		}
+	}
+	
+	std::cout << "reserve test finished" << std::endl;
+	std::cin.ignore();
+	//*** rt
+
 	vector<double>* ownIntVec = new vector<double>();
 
 	std::cout << "size:" << ownIntVec->size() << "/" << ownIntVec->capacity() << std::endl;
@@ -183,13 +177,4 @@ int main()
 	std::cin.ignore();
 
 	delete ownIntVec;
-/*
-	IntVector intVec;
-	for(int i = 0; i < 10; i++)
-		intVec.push_back(i);
-
-	for (int i = 0; i < 10; i++)
-		std::cout << intVec[i] << std::endl;
-
-	std::cin.ignore();*/
 }
