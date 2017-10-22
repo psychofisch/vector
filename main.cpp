@@ -74,17 +74,17 @@ public:
 
 	T operator[](size_t i)
 	{
-		return *(static_cast<T*>(m_memory) + i);
+		return *(static_cast<T*>(m_memory) + i * sizeof(T*));
 	};
 
 	void push_back(const T& i)
 	{
-		if (m_capacity < m_size + 1)
+		if (m_size >= m_capacity)
 		{
-			resize(m_capacity * 2);
+			reserve(m_capacity * 2);
 		}
 
-		T* tmp = new(static_cast<T*>(m_memory) + m_size) T;
+		T* tmp = new(static_cast<T*>(m_memory) + m_size * sizeof(T*)) T;
 		*tmp = i;
 		m_size++;
 	};
@@ -99,27 +99,62 @@ public:
 		return m_size;
 	};
 
-	void resize(size_t s, T val = new T())
+	void resize(size_t s, T val = T())
 	{
-		size_t newCapacity = s;
-		void* newMemory = new T[newCapacity];
-
-		for (size_t i = 0; i < newCapacity; i++)
+		if (s < m_size)
 		{
-			T* tmp = new(static_cast<T*>(newMemory) + i) T;
-			*tmp = *(static_cast<T*>(m_memory) + i);
+			for (size_t i = s; i < m_size; i++)
+			{
+				(static_cast<T*>(m_memory) + i * sizeof(T*))->~T();
+			}
+			m_size = s;
 		}
+		else if (s > m_size)
+		{
+			if (s > m_capacity)
+			{
+				size_t newCapacity = s;
+				void* newMemory = new T[newCapacity];
 
-		delete[] m_memory;
-		m_memory = newMemory;
-		m_capacity = newCapacity;
+				//for (size_t i = 0; i < s; i++)
+				//{
+				//	T* tmp = new(static_cast<T*>(newMemory) + i * sizeof(T*)) T;
+
+				//	if (i < m_size)
+				//		*tmp = *(static_cast<T*>(m_memory) + i * sizeof(T*));//copy old object
+				//	else
+				//		*tmp = val;//create default
+				//}
+
+				delete[] m_memory;
+				m_memory = newMemory;
+				m_capacity = newCapacity;
+				m_size = newCapacity;
+			}
+			else {
+				for (size_t i = m_size; i < s; i++)
+				{
+					T* tmp = new(static_cast<T*>(m_memory) + i * sizeof(T*)) T;
+					*tmp = val;
+				}
+				m_size = s;
+			}
+		}
 	};
 
-	/*void reserve(size_t s)
+	void reserve(size_t s)
 	{
 		size_t newCapacity = s;
 		void* newMemory = new T[newCapacity];
-	};*/
+
+		for (size_t i = 0; i < m_size; i++)
+		{
+			T* tmp = new(static_cast<T*>(newMemory) + i * sizeof(T*)) T;
+			*tmp = *(static_cast<T*>(m_memory) + i * sizeof(T*));
+		}
+
+		m_capacity = newCapacity;
+	};
 
 	~vector()
 	{
@@ -134,18 +169,20 @@ private:
 
 int main()
 {
-	vector<double> ownIntVec;
+	vector<double>* ownIntVec = new vector<double>();
 
-	std::cout << "size:" << ownIntVec.size() << "/" << ownIntVec.capacity() << std::endl;
-
-	for (int i = 0; i < 10; i++)
-		ownIntVec.push_back(0.12345 * i);
+	std::cout << "size:" << ownIntVec->size() << "/" << ownIntVec->capacity() << std::endl;
 
 	for (int i = 0; i < 10; i++)
-		std::cout << ownIntVec[i] << std::endl;
+		ownIntVec->push_back(0.125 * i);
 
-	std::cout << "size:" << ownIntVec.size() << "/" << ownIntVec.capacity() << std::endl;
+	for (int i = 0; i < 10; i++)
+		std::cout << (*ownIntVec)[i] << std::endl;
+
+	std::cout << "size:" << ownIntVec->size() << "/" << ownIntVec->capacity() << std::endl;
 	std::cin.ignore();
+
+	delete ownIntVec;
 /*
 	IntVector intVec;
 	for(int i = 0; i < 10; i++)
