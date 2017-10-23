@@ -1,5 +1,3 @@
-//known problems: non-default constructor classes/structs do not work
-
 #include <new>
 #include <iostream>
 
@@ -11,23 +9,25 @@ class vector
 {
 public:
 	vector()
-		:vector(0)
+		:m_size(0),
+		m_capacity(0),
+		m_memory(nullptr)
 	{};
 
 	explicit vector(size_t s, const T& val = T())
 		:m_size(s),
 		m_capacity(s),
-		m_memory(new T[m_capacity])
+		m_memory(new char[m_capacity * sizeof(T)])
 	{
 		for (size_t i = 0; i < m_size; i++)
 		{
-			m_memory[i] = val;
+			static_cast<T*>(m_memory)[i] = val;
 		}
 	}
 
 	T& operator[](size_t i)
 	{
-		return *(m_memory + i);
+		return static_cast<T*>(m_memory)[i];
 	};
 
 	void push_back(const T& i)
@@ -40,7 +40,7 @@ public:
 				reserve(m_capacity * 2);
 		}
 
-		new(m_memory + m_size) T(i);
+		new(static_cast<T*>(m_memory) + m_size) T(i);
 		m_size++;
 	};
 
@@ -56,11 +56,13 @@ public:
 
 	void resize(size_t s, const T& val = T())
 	{
+		T* data = static_cast<T*>(m_memory);
+
 		if (s < m_size)
 		{
 			for (size_t i = s; i < m_size; i++)
 			{
-				m_memory[i].~T();
+				data[i].~T();
 			}
 			m_size = s;
 		}
@@ -69,14 +71,14 @@ public:
 			if (s > m_capacity)
 			{
 				size_t newCapacity = s;
-				T* newMemory = new T[newCapacity];
+				void* newMemory = new char[newCapacity * sizeof(T)];
 
 				for (size_t i = 0; i < s; i++)
 				{
 					if (i < m_size)
-						newMemory[i] = *(m_memory + i);
+						static_cast<T*>(newMemory)[i] = data[i];
 					else
-						newMemory[i] = val;
+						static_cast<T*>(newMemory)[i] = val;
 				}
 
 				delete[] m_memory;
@@ -87,23 +89,23 @@ public:
 			else {
 				for (size_t i = m_size; i < s; i++)
 				{
-					new(m_memory + i) T(val);
+					new(static_cast<T*>(m_memory) + i) T(val);
 				}
 				m_size = s;
 			}
 		}
 	};
 
-	void reserve(size_t s, const T& val = T())
+	void reserve(size_t s)
 	{
 		if (s > m_capacity)
 		{
 			size_t newCapacity = s;
-			T* newMemory = new T[newCapacity]{val};
+			void* newMemory = new char[newCapacity * sizeof(T)];
 
 			for (size_t i = 0; i < m_size; i++)
 			{
-				newMemory[i] = m_memory[i];
+				static_cast<T*>(newMemory)[i] = static_cast<T*>(m_memory)[i];
 			}
 
 			delete[] m_memory;
@@ -114,9 +116,11 @@ public:
 
 	size_t erase(size_t start, size_t end)
 	{
+		T* data = static_cast<T*>(m_memory);
+
 		//no range check needed -> An invalid position or range causes undefined behavior.(http://www.cplusplus.com/reference/vector/vector/erase/)
 		for (size_t i = start; i <= end; i++)
-			m_memory[i].~T();
+			data[i].~T();
 
 		size_t offset = end - start;
 
@@ -126,9 +130,9 @@ public:
 		for (size_t i = start; i < m_size; i++)
 		{
 			if (i <= end)
-				new(m_memory + i) T(m_memory[i + offset]);//copy constructor has to do a deep copy
+				new(data + i) T(data[i + offset]);//copy constructor has to do a deep copy
 			else
-				m_memory[i] = m_memory[i + offset];
+				data[i] = data[i + offset];
 		}
 		m_size -= offset;
 
@@ -142,7 +146,7 @@ public:
 
 	size_t erase_by_swap(size_t p)
 	{
-		T* data = m_memory;
+		T* data = static_cast<T*>(m_memory);
 		(data + p)->~T();
 
 		new(data + p) T(*(data + m_size - 1));
@@ -158,7 +162,7 @@ public:
 	};
 
 private:
-	T* m_memory;
+	void* m_memory;
 	size_t m_capacity;
 	size_t m_size;
 };
@@ -175,15 +179,30 @@ public:
 		b = v2;
 	}
 
-	testClass()
+	/*testClass()
 		:testClass(0, 0.0)
-	{}
+	{}*/
 };
 
 #define TESTS 1
 
 int main()
 {
+#if TESTS == 0
+	std::vector<testClass> stdVector;
+	stdVector.reserve(19);
+	for (int i = 0; i < 20; i++)
+	{
+		testClass tmp(i, 0.125 * i);
+		stdVector[i] = tmp;//this shouldn't work in release mode but it does...
+	}
+
+	for (int i = 0; i < 20; i++)
+		std::cout << stdVector[i].a << "|" << stdVector[i].b << std::endl;
+
+	std::cin.ignore();
+#endif
+
 #if TESTS
 	//reserve test
 		//expected output
@@ -311,48 +330,48 @@ int main()
 		std::cout << "erase_by_swap test finished" << std::endl;
 	//*** ebst
 
-#endif
-
 	//own test
-	std::cout << std::endl;
-	vector<testClass>* ownIntVec = new vector<testClass>();
-	testClass tC(0, 0.0);
+		{
+			std::cout << std::endl;
+			vector<testClass> ownIntVec;
+			testClass tC(0, 0.0);
 
-	std::cout << "size:" << ownIntVec->size() << "/" << ownIntVec->capacity() << std::endl;
+			std::cout << "size:" << ownIntVec.size() << "/" << ownIntVec.capacity() << std::endl;
 
-	for (int i = 0; i < 20; i++)
-	{
-		tC.a = i;
-		tC.b = 0.125 * i;
-		ownIntVec->push_back(tC);
-	}
+			ownIntVec.reserve(20);
+			for (int i = 0; i < 20; i++)
+			{
+				testClass tmp(i, 0.125 * i);
+				ownIntVec[i] = tmp;
+				//ownIntVec.push_back(tmp);
+			}
 
-	for (int i = 0; i < ownIntVec->size(); i++)
-		std::cout << (*ownIntVec)[i].a << "|" << (*ownIntVec)[i].b << std::endl;
+			for (int i = 0; i < ownIntVec.size(); i++)
+				std::cout << ownIntVec[i].a << "|" << ownIntVec[i].b << std::endl;
 
-	std::cout << "size:" << ownIntVec->size() << "/" << ownIntVec->capacity() << std::endl;
+			std::cout << "size:" << ownIntVec.size() << "/" << ownIntVec.capacity() << std::endl;
 
-	ownIntVec->resize(10);//no allocation
-	ownIntVec->resize(20);//no allocation and elements 10-19 are (0|0.0)
-	ownIntVec->reserve(50);//allocate memory here but size is still 20
-	ownIntVec->resize(25, testClass(1337, 13.37));//no allocation should happen
-	ownIntVec->erase(5);
-	ownIntVec->erase(1, 4);
-	ownIntVec->push_back(testClass(666, 66.6));
-	ownIntVec->erase_by_swap(0);//first element is the one from one line above
-	//vector has a size of 21 and a capacity of 50 here
+			ownIntVec.resize(10, tC);//no allocation
+			ownIntVec.resize(20, tC);//no allocation and elements 10-19 are (0|0.0)
+			ownIntVec.reserve(50);//allocate memory here but size is still 20
+			ownIntVec.resize(25, testClass(1337, 13.37));//no allocation should happen
+			ownIntVec.erase(5);
+			ownIntVec.erase(1, 4);
+			ownIntVec.push_back(testClass(666, 66.6));
+			ownIntVec.erase_by_swap(0);//first element is the one from one line above
+			//vector has a size of 21 and a capacity of 50 here
 
-	(*ownIntVec)[1].a = 10;
-	(*ownIntVec)[1].b = 10.101;
+			ownIntVec[1].a = 10;
+			ownIntVec[1].b = 10.101;
 
-	for (size_t i = 0; i < ownIntVec->size(); i++)
-		std::cout << (*ownIntVec)[i].a << "|" << (*ownIntVec)[i].b << std::endl;
+			for (size_t i = 0; i < ownIntVec.size(); i++)
+				std::cout << ownIntVec[i].a << "|" << ownIntVec[i].b << std::endl;
 
-	std::cout << "size:" << ownIntVec->size() << "/" << ownIntVec->capacity() << std::endl;
+			std::cout << "size:" << ownIntVec.size() << "/" << ownIntVec.capacity() << std::endl;
 
-	delete ownIntVec;
-
-	std::cout << "press ENTER to exit\n";
-	std::cin.ignore();
+			std::cout << "press ENTER to exit\n";
+			std::cin.ignore();
+		}
 	//*** own test
+#endif
 }
