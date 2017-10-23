@@ -9,13 +9,12 @@ class vector
 {
 public:
 	vector()
-	{
-		m_size = 0;
-		m_capacity = 0;
-		m_memory = new T[m_capacity];
-	};
+		:m_size(0),
+		m_capacity(0),
+		m_memory(new T[m_capacity])
+	{};
 
-	T operator[](size_t i)
+	T& operator[](size_t i)
 	{
 		return *(static_cast<T*>(m_memory) + i);
 	};
@@ -35,23 +34,25 @@ public:
 		m_size++;
 	};
 
-	size_t capacity()
+	size_t capacity() const
 	{
 		return m_capacity;
 	};
 
-	size_t size()
+	size_t size() const
 	{
 		return m_size;
 	};
 
 	void resize(size_t s, const T& val = T())
 	{
+		T* memoryPtr = static_cast<T*>(m_memory);
+
 		if (s < m_size)
 		{
 			for (size_t i = s; i < m_size; i++)
 			{
-				(static_cast<T*>(m_memory) + i)->~T();
+				(memoryPtr + i)->~T();
 			}
 			m_size = s;
 		}
@@ -67,9 +68,9 @@ public:
 					T* tmp = new(static_cast<T*>(newMemory) + i) T;
 
 					if (i < m_size)
-						*tmp = *(static_cast<T*>(m_memory) + i);
+						*tmp = *(memoryPtr + i);
 					else
-						*tmp = T(val);
+						*tmp = val;//would "T(val)" be better?
 				}
 
 				delete[] m_memory;
@@ -80,8 +81,8 @@ public:
 			else {
 				for (size_t i = m_size; i < s; i++)
 				{
-					T* tmp = new(static_cast<T*>(m_memory) + i) T;
-					*tmp = val;
+					T* tmp = new(memoryPtr + i) T;
+					*tmp = val;//same question as above
 				}
 				m_size = s;
 			}
@@ -98,7 +99,7 @@ public:
 			for (size_t i = 0; i < m_size; i++)
 			{
 				T* tmp = new(static_cast<T*>(newMemory) + i) T;
-				*tmp = *(static_cast<T*>(m_memory) + i);
+				*tmp = *(static_cast<T*>(m_memory) + i);//see resize
 			}
 
 			delete[] m_memory;
@@ -115,9 +116,12 @@ public:
 		for (size_t i = start; i <= end; i++)
 			(data + i)->~T();
 
-		size_t offset = end - start + 1;
+		size_t offset = end - start;
 
-		for (size_t i = start; offset > 0 && i < m_size; i++)
+		if (offset == 0)
+			offset++;
+
+		for (size_t i = start; i < m_size; i++)
 		{
 			T* tmp;
 			if (i <= end)
@@ -137,6 +141,19 @@ public:
 		return erase(p, p);
 	};
 
+	size_t erase_by_swap(size_t p)
+	{
+		T* data = static_cast<T*>(m_memory);
+		(data + p)->~T();
+
+		T* tmp = new(data + p) T;
+		*tmp = *(data + m_size - 1);
+
+		m_size--;
+
+		return p;
+	};
+
 	~vector()
 	{
 		delete[] m_memory;
@@ -153,6 +170,16 @@ class testClass
 public:
 	int a;
 	double b;
+
+	testClass(int v1, double v2)
+	{
+		a = v1;
+		b = v2;
+	}
+
+	testClass()
+		:testClass(0, 0.0)
+	{}
 };
 
 #define TESTS 1
@@ -165,14 +192,14 @@ int main()
 		/*
 		making foo grow :
 		capacity changed : 1
-			capacity changed : 2
-			capacity changed : 4
-			capacity changed : 8
-			capacity changed : 16
-			capacity changed : 32
-			capacity changed : 64
-			capacity changed : 128
-			making bar grow :
+		capacity changed : 2
+		capacity changed : 4
+		capacity changed : 8
+		capacity changed : 16
+		capacity changed : 32
+		capacity changed : 64
+		capacity changed : 128
+		making bar grow :
 		capacity changed : 100
 		*/
 	{
@@ -231,18 +258,26 @@ int main()
 	{
 		std::cout << std::endl;
 		//expected output
-		//myvector contains: 4 5 7 8 9 10
+		/*
+		size: 10
+		size: 9
+		size: 6
+		myvector contains: 4 5 7 8 9 10
+		*/
 		vector<int> myvector;
 
 		// set some values (from 1 to 10)
 		for (int i = 1; i <= 10; i++)
 			myvector.push_back(i);
 
+		std::cout << "size: " << myvector.size() << std::endl;
 		// erase the 6th element
 		myvector.erase(5);
+		std::cout << "size: " << myvector.size() << std::endl;
 
 		// erase the first 3 elements:
 		myvector.erase(0, 3);
+		std::cout << "size: " << myvector.size() << std::endl;
 
 		std::cout << "myvector contains:";
 		for (unsigned i = 0; i < myvector.size(); ++i)
@@ -251,6 +286,32 @@ int main()
 		std::cout << "erase test finished" << std::endl;
 	}
 	//*** et
+
+	//erase_by_swap test
+		std::cout << std::endl;
+		//expected output
+		/*
+			size: 5
+			size: 4
+			myvector contains: 1 5 3 4
+		*/
+		vector<int> myvector;
+
+		// set some values (from 1 to 10)
+		for (int i = 1; i <= 5; i++)
+			myvector.push_back(i);
+		std::cout << "size: " << myvector.size() << std::endl;
+
+		// erase the 2nd element
+		myvector.erase_by_swap(1);
+		std::cout << "size: " << myvector.size() << std::endl;
+
+		std::cout << "myvector contains:";
+		for (unsigned i = 0; i < myvector.size(); ++i)
+			std::cout << ' ' << myvector[i];
+		std::cout << std::endl;
+		std::cout << "erase_by_swap test finished" << std::endl;
+	//*** ebst
 #endif
 
 	//own test
@@ -260,14 +321,32 @@ int main()
 
 	std::cout << "size:" << ownIntVec->size() << "/" << ownIntVec->capacity() << std::endl;
 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 20; i++)
 	{
 		tC.a = i;
 		tC.b = 0.125 * i;
 		ownIntVec->push_back(tC);
 	}
 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < ownIntVec->size(); i++)
+		std::cout << (*ownIntVec)[i].a << "|" << (*ownIntVec)[i].b << std::endl;
+
+	std::cout << "size:" << ownIntVec->size() << "/" << ownIntVec->capacity() << std::endl;
+
+	ownIntVec->resize(10);//no allocation
+	ownIntVec->resize(20);//no allocation and elements 10-19 are (0|0.0)
+	ownIntVec->reserve(50);//allocate memory here but size is still 20
+	ownIntVec->resize(25, testClass(1337, 13.37));//no allocation should happen
+	ownIntVec->erase(5);
+	ownIntVec->erase(1, 4);
+	ownIntVec->push_back(testClass(666, 66.6));
+	ownIntVec->erase_by_swap(0);//first element is the one from one line above
+	//vector has a size of 21 and a capacity of 50 here
+
+	(*ownIntVec)[1].a = 10;
+	(*ownIntVec)[1].b = 10.101;
+
+	for (size_t i = 0; i < ownIntVec->size(); i++)
 		std::cout << (*ownIntVec)[i].a << "|" << (*ownIntVec)[i].b << std::endl;
 
 	std::cout << "size:" << ownIntVec->size() << "/" << ownIntVec->capacity() << std::endl;
