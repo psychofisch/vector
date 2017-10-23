@@ -3,20 +3,31 @@
 #include <new>
 #include <iostream>
 
+#include <vector>
+
 //all specifications from http://www.cplusplus.com/reference/vector/vector/
 template <class T>
 class vector
 {
 public:
 	vector()
-		:m_size(0),
-		m_capacity(0),
-		m_memory(new T[m_capacity])
+		:vector(0)
 	{};
+
+	explicit vector(size_t s, const T& val = T())
+		:m_size(s),
+		m_capacity(s),
+		m_memory(new T[m_capacity])
+	{
+		for (size_t i = 0; i < m_size; i++)
+		{
+			m_memory[i] = val;
+		}
+	}
 
 	T& operator[](size_t i)
 	{
-		return *(static_cast<T*>(m_memory) + i);
+		return *(m_memory + i);
 	};
 
 	void push_back(const T& i)
@@ -29,8 +40,7 @@ public:
 				reserve(m_capacity * 2);
 		}
 
-		T* tmp = new(static_cast<T*>(m_memory) + m_size) T;
-		*tmp = i;
+		new(m_memory + m_size) T(i);
 		m_size++;
 	};
 
@@ -46,13 +56,11 @@ public:
 
 	void resize(size_t s, const T& val = T())
 	{
-		T* memoryPtr = static_cast<T*>(m_memory);
-
 		if (s < m_size)
 		{
 			for (size_t i = s; i < m_size; i++)
 			{
-				(memoryPtr + i)->~T();
+				m_memory[i].~T();
 			}
 			m_size = s;
 		}
@@ -61,16 +69,14 @@ public:
 			if (s > m_capacity)
 			{
 				size_t newCapacity = s;
-				void* newMemory = new T[newCapacity];
+				T* newMemory = new T[newCapacity]; //TODO: classes without a default-constructor should work
 
 				for (size_t i = 0; i < s; i++)
 				{
-					T* tmp = new(static_cast<T*>(newMemory) + i) T;
-
 					if (i < m_size)
-						*tmp = *(memoryPtr + i);
+						newMemory[i] = *(m_memory + i);
 					else
-						*tmp = val;//would "T(val)" be better?
+						newMemory[i] = val;
 				}
 
 				delete[] m_memory;
@@ -81,25 +87,23 @@ public:
 			else {
 				for (size_t i = m_size; i < s; i++)
 				{
-					T* tmp = new(memoryPtr + i) T;
-					*tmp = val;//same question as above
+					new(m_memory + i) T(val);
 				}
 				m_size = s;
 			}
 		}
 	};
 
-	void reserve(size_t s)
+	void reserve(size_t s, const T& val = T()) //TODO: remove second parameter to comply STL (non-default constructor classes/structs)
 	{
 		if (s > m_capacity)
 		{
 			size_t newCapacity = s;
-			void* newMemory = new T[newCapacity];
+			T* newMemory = new T[newCapacity]{val};
 
 			for (size_t i = 0; i < m_size; i++)
 			{
-				T* tmp = new(static_cast<T*>(newMemory) + i) T;
-				*tmp = *(static_cast<T*>(m_memory) + i);//see resize
+				newMemory[i] = m_memory[i];
 			}
 
 			delete[] m_memory;
@@ -110,11 +114,9 @@ public:
 
 	size_t erase(size_t start, size_t end)
 	{
-		T* data = static_cast<T*>(m_memory);
-
 		//no range check needed -> An invalid position or range causes undefined behavior.(http://www.cplusplus.com/reference/vector/vector/erase/)
 		for (size_t i = start; i <= end; i++)
-			(data + i)->~T();
+			m_memory[i].~T();
 
 		size_t offset = end - start;
 
@@ -123,13 +125,10 @@ public:
 
 		for (size_t i = start; i < m_size; i++)
 		{
-			T* tmp;
 			if (i <= end)
-				tmp = new(data + i) T;
+				new(m_memory + i) T(m_memory[i + offset]);
 			else
-				tmp = (data + i);
-
-			*tmp = *(data + i + offset);
+				m_memory[i + offset] = m_memory[i];
 		}
 		m_size -= offset;
 
@@ -143,11 +142,10 @@ public:
 
 	size_t erase_by_swap(size_t p)
 	{
-		T* data = static_cast<T*>(m_memory);
+		T* data = m_memory;
 		(data + p)->~T();
 
-		T* tmp = new(data + p) T;
-		*tmp = *(data + m_size - 1);
+		new(data + p) T(*(data + m_size - 1));
 
 		m_size--;
 
@@ -160,7 +158,7 @@ public:
 	};
 
 private:
-	void* m_memory;
+	T* m_memory;
 	size_t m_capacity;
 	size_t m_size;
 };
@@ -312,12 +310,13 @@ int main()
 		std::cout << std::endl;
 		std::cout << "erase_by_swap test finished" << std::endl;
 	//*** ebst
+
 #endif
 
 	//own test
 	std::cout << std::endl;
 	vector<testClass>* ownIntVec = new vector<testClass>();
-	testClass tC;
+	testClass tC(0, 0.0);
 
 	std::cout << "size:" << ownIntVec->size() << "/" << ownIntVec->capacity() << std::endl;
 
