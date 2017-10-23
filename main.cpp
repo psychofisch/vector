@@ -1,4 +1,3 @@
-//Fischer Thomas, Was Viktor, Winkler Roman
 //known problems: non-default constructor classes/structs do not work
 
 #include <new>
