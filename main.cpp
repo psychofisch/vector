@@ -1,4 +1,5 @@
 //Fischer Thomas, Was Viktor, Winkler Roman
+//known problems: non-default constructor classes/structs do not work
 
 #include <new>
 #include <iostream>
@@ -69,7 +70,7 @@ public:
 			if (s > m_capacity)
 			{
 				size_t newCapacity = s;
-				T* newMemory = new T[newCapacity]; //TODO: classes without a default-constructor should work
+				T* newMemory = new T[newCapacity];
 
 				for (size_t i = 0; i < s; i++)
 				{
@@ -94,7 +95,7 @@ public:
 		}
 	};
 
-	void reserve(size_t s, const T& val = T()) //TODO: remove second parameter to comply STL (non-default constructor classes/structs)
+	void reserve(size_t s, const T& val = T())
 	{
 		if (s > m_capacity)
 		{
@@ -126,9 +127,9 @@ public:
 		for (size_t i = start; i < m_size; i++)
 		{
 			if (i <= end)
-				new(m_memory + i) T(m_memory[i + offset]);
+				new(m_memory + i) T(m_memory[i + offset]);//copy constructor has to do a deep copy
 			else
-				m_memory[i + offset] = m_memory[i];
+				m_memory[i] = m_memory[i + offset];
 		}
 		m_size -= offset;
 
