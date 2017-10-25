@@ -1,5 +1,6 @@
 #include <new>
 #include <iostream>
+#include <assert.h>
 
 #include <vector>
 
@@ -30,17 +31,29 @@ public:
 		return static_cast<T*>(m_memory)[i];
 	};
 
+	const T& operator[](size_t i) const
+	{
+		return static_cast<T*>(m_memory)[i];
+	};
+
 	void push_back(const T& i)
 	{
-		if (m_size >= m_capacity)
+		assert("Size of the vector is greater then its capacity" && !(m_size > m_capacity));
+
+		if (m_size == m_capacity)
 		{
+			T tmp = i;//protection if "i" is a reference to an element from the vector itself
+
 			if (m_capacity == 0)
 				reserve(1);
 			else
 				reserve(m_capacity * 2);
-		}
 
-		new(static_cast<T*>(m_memory) + m_size) T(i);
+			new(static_cast<T*>(m_memory) + m_size) T(tmp);
+		}
+		else {
+			new(static_cast<T*>(m_memory) + m_size) T(i);
+		}
 		m_size++;
 	};
 
@@ -130,7 +143,7 @@ public:
 		for (size_t i = start; i < m_size; i++)
 		{
 			if (i <= end)
-				new(data + i) T(data[i + offset]);//copy constructor has to do a deep copy
+				new(data + i) T(data[i + offset]);
 			else
 				data[i] = data[i + offset];
 		}
@@ -147,10 +160,17 @@ public:
 	size_t erase_by_swap(size_t p)
 	{
 		T* data = static_cast<T*>(m_memory);
-		(data + p)->~T();
 
-		new(data + p) T(*(data + m_size - 1));
+		if (p == m_size - 1)
+		{
+			(data + p)->~T();
+		}
+		else {
+			T tmp = *(data + m_size - 1);//protection if the last element is a reference to an element from the vector itself
+			(data + p)->~T();
 
+			new(data + p) T(tmp);
+		}
 		m_size--;
 
 		return p;
@@ -338,13 +358,15 @@ int main()
 
 			std::cout << "size:" << ownIntVec.size() << "/" << ownIntVec.capacity() << std::endl;
 
-			ownIntVec.reserve(20);
+			//ownIntVec.reserve(20);
 			for (int i = 0; i < 20; i++)
 			{
 				testClass tmp(i, 0.125 * i);
-				ownIntVec[i] = tmp;
-				//ownIntVec.push_back(tmp);
+				//ownIntVec[i] = tmp;
+				ownIntVec.push_back(tmp);
 			}
+
+			ownIntVec.push_back(ownIntVec[0]);
 
 			for (int i = 0; i < ownIntVec.size(); i++)
 				std::cout << ownIntVec[i].a << "|" << ownIntVec[i].b << std::endl;
